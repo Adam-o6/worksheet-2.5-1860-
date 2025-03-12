@@ -12,6 +12,7 @@ function Sys.shiftLeft 0
     pop local 0         // Pop x (value to shift)
     pop local 1         // Pop y (shift count)
 
+    // Check if y is greater than 0 before starting loop
     label SHIFT_LOOP
     push local 1
     if-goto CONTINUE_SHIFT   // If y > 0, continue
