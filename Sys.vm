@@ -1,13 +1,11 @@
-// Function to compute bitwise XOR
+// Function to compute bitwise XOR (x ^ y)
 function Sys.xor 0
     pop local 0         // Pop first value into local 0
     pop local 1         // Pop second value into local 1
-
-    push local 0        // Push first value back onto stack
-    push local 1        // Push second value back onto stack
-    xor                 // Perform bitwise XOR operation
-
-    return              // Return with result at top of the stack
+    push local 0        // Push first value
+    push local 1        // Push second value
+    xor                 // Perform XOR operation
+    return              // Return result
 
 // Function to shift left (x << y)
 function Sys.shiftLeft 0
@@ -36,14 +34,100 @@ function Sys.shiftLeft 0
     push local 0             // Push final result onto stack
     return
 
-// Initialization function to test both functions
+// Function to compute the parity of the 15 right-most bits
+function Sys.computeParity 0
+    pop local 0             // Input number
+    push constant 0         // parityBit = 0
+    pop local 1             // Store in local 1
+
+    push constant 0         // i = 0
+    pop local 2             // Store in local 2
+
+    label PARITY_LOOP
+    push local 2
+    push constant 15
+    sub
+    if-goto CHECK_BIT       // If i < 15, check bit
+    goto END_PARITY         // Otherwise, exit
+
+    label CHECK_BIT
+    push constant 1
+    push local 2
+    call Sys.shiftLeft 2    // Compute bitmask: 1 << i
+    pop local 3             // Store bitmask
+
+    push local 0
+    push local 3
+    and                     // inputString & bitmask
+    if-goto UPDATE_PARITY   // If result != 0, update parity
+
+    goto INCREMENT_I        // Otherwise, continue loop
+
+    label UPDATE_PARITY
+    push local 1
+    push constant 1
+    call Sys.xor 2          // parityBit = parityBit ^ 1
+    pop local 1             // Store updated parityBit
+
+    label INCREMENT_I
+    push local 2
+    push constant 1
+    add                     // i++
+    pop local 2             // Store updated i
+    goto PARITY_LOOP        // Repeat loop
+
+    label END_PARITY
+    push local 1            // Push final parity bit
+    return
+
+// Function to encode the input with the parity bit in the MSB
+function Sys.encode 0
+    pop local 0             // Pop input number
+
+    push local 0
+    call Sys.computeParity 1  // Compute the parity bit
+    pop local 1             // Store parity bit in local 1
+
+    push constant 32768     // 10000000 00000000 (MSB bitmask)
+    push local 1
+    if-goto SET_MSB         // If parity bit is 1, set MSB
+
+    goto CLEAR_MSB          // Otherwise, clear MSB
+
+    label SET_MSB
+    push local 0
+    push constant 32768
+    or                      // Set MSB (input | 10000000 00000000)
+    pop local 0
+    goto END_ENCODE
+
+    label CLEAR_MSB
+    push local 0
+    push constant 32768
+    not
+    and                     // Clear MSB (input & ~10000000 00000000)
+    pop local 0
+
+    label END_ENCODE
+    push local 0            // Push final encoded result to the stack
+    return
+
+// Initialization function to test all functions
 function Sys.init 0
     // Test Sys.xor: 12 ^ 6 should give 10
     push constant 12
     push constant 6
-    call Sys.xor 2           // Expect 10 on top of stack
+    call Sys.xor 2           // Expect 10
 
     // Test Sys.shiftLeft: 6 << 2 should give 24
     push constant 6
     push constant 2
-    call Sys.shiftLeft 2      // Expect 24 on top of stack
+    call Sys.shiftLeft 2      // Expect 24
+
+    // Test Sys.computeParity: 31 (00000000 00011111) has an odd number of 1s, so result should be 1
+    push constant 31
+    call Sys.computeParity 1  // Expect 1
+
+    // Test Sys.encode: 31 should be encoded with the MSB set (10000000 00011111)
+    push constant 31
+    call Sys.encode 1         // Expect 32863 (binary 10000000 00011111)
