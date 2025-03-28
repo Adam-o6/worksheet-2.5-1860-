@@ -1,204 +1,126 @@
-/*******************************************************
- * Sys.xor
- * Computes bitwise XOR of the top two stack values.
- * Uses the identity:
- *    a XOR b = (a AND NOT b) OR (NOT a AND b)
- *******************************************************/
+// XOR function: result = (a + b) - 2*(a & b)
 function Sys.xor 0
-  // Pop the two values: b first, then a
-  pop temp 0 // b
-  pop temp 1 // a
+    push argument 0
+    push argument 1
+    add
+    push argument 0
+    push argument 1
+    and
+    push argument 0
+    push argument 1
+    and
+    add
+    sub
+    return
 
-  // Compute (a AND NOT b)
-  push temp 1
-  push temp 0
-  not
-  and
-
-  // Compute (NOT a AND b), then OR with the above
-  push temp 1
-  not
-  push temp 0
-  and
-  or
-
-  // Return the result on top of the stack
-  return
-
-
-/*******************************************************
- * Sys.shiftLeft
- * Shifts (argument0) left by (argument1) bits (x << y).
- * Implementation:
- *   local 0 => x
- *   local 1 => y
- * Repeatedly doubles x while decrementing y.
- *******************************************************/
+// Shift left function: result = x << y
 function Sys.shiftLeft 2
-  // Store arguments into local variables
-  push argument 0
-  pop local 0   // x
-  push argument 1
-  pop local 1   // y
-
-  // Loop until y == 0
-  label SHIFT_LOOP
-    push local 1
+    push argument 1
     push constant 0
     eq
-    if-goto SHIFT_END
+    if-goto NO_SHIFT_NEEDED  // if y == 0, return x
 
-    // Double x
-    push local 0
-    push local 0
-    add
-    pop local 0
+    push constant 0
+    pop local 0  // i = 0 (counter)
+    push argument 0
+    pop local 1  // result = x
 
-    // Decrement y
+label SHIFT_ITERATE
+    push local 0
+    push argument 1
+    eq
+    if-goto SHIFT_COMPLETE  // if i == y, exit loop
+
     push local 1
+    push local 1
+    add
+    pop local 1  // result *= 2 (shift left by 1)
+
+    push local 0
     push constant 1
-    sub
-    pop local 1
+    add
+    pop local 0  // i++
 
-    goto SHIFT_LOOP
-  label SHIFT_END
+    goto SHIFT_ITERATE
 
-  // Return x on top of the stack
-  push local 0
-  return
+label SHIFT_COMPLETE
+    push local 1
+    return
 
+label NO_SHIFT_NEEDED
+    push argument 0
+    return
 
-/*******************************************************
- * Sys.computeParity
- * Computes the parity of the lower 15 bits of the top stack value.
- *   - Ignores the most significant (16th) bit.
- *   - Returns 0 if there's an even count of 1s in bits 0..14,
- *     or 1 if there's an odd count.
- * Implementation:
- *   local 0 => parity (0 or 1)
- *   local 1 => i (bit index 0..14)
- *   local 2 => input value
- *   local 3 => bitmask
- *******************************************************/
-function Sys.computeParity 4
-  // Pop the input
-  pop local 2       // input
+// Compute parity function: result = parity bit of input
+function Sys.computeParity 2
+    push constant 0
+    pop local 0  // parity = 0
+    push constant 0
+    pop local 1  // i = 0 (bit position)
 
-  // Initialize parity = 0
-  push constant 0
-  pop local 0       // parity
-
-  // Initialize i = 0
-  push constant 0
-  pop local 1       // i
-
-  // Loop from i=0 to i=14
-  label PARITY_LOOP
-    // if i == 15 => done
+label PARITY_ITERATE
     push local 1
     push constant 15
     eq
-    if-goto PARITY_END
+    if-goto PARITY_DONE  // if i == 15, exit loop
 
-    // bitmask = 1 << i
     push constant 1
     push local 1
-    call Sys.shiftLeft 2
-    pop local 3      // local 3 = bitmask
+    call Sys.shiftLeft 2  // bitmask = 1 << i
+    push argument 0
+    and  // ithBit = input & bitmask
 
-    // if (input & bitmask) != 0 => toggle parity
-    push local 2
-    push local 3
-    and
-    if-goto BIT_SET     // jumps if != 0
-    goto BIT_NOT_SET
+    push constant 0
+    eq
+    not
+    if-goto FLIP_PARITY  // if ithBit != 0, flip parity
 
-    label BIT_SET
-      // parity = parity XOR 1
-      push local 0
-      push constant 1
-      call Sys.xor 2
-      pop local 0
-    label BIT_NOT_SET
-
-    // i++
     push local 1
     push constant 1
     add
-    pop local 1
+    pop local 1  // i++
+    goto PARITY_ITERATE
 
-    goto PARITY_LOOP
-  label PARITY_END
+label FLIP_PARITY
+    push local 0
+    push constant 1
+    call Sys.xor 2  // parity ^= 1
+    pop local 0
 
-  // Return final parity
-  push local 0
-  return
+    push local 1
+    push constant 1
+    add
+    pop local 1  // i++
+    goto PARITY_ITERATE
 
-
-/*******************************************************
- * Sys.encode
- * Sets the most significant bit (bit 15) of the input
- * to the parity of the lower 15 bits.
- *   - If parity == 1 => set MSB
- *   - If parity == 0 => clear MSB
- * Returns the modified value on the stack.
- *******************************************************/
-function Sys.encode 0
-  // Pop the input
-  pop temp 0
-
-  // Compute the parity of the input
-  push temp 0
-  call Sys.computeParity 1
-  pop temp 1  // parity in temp 1
-
-  // If parity == 1 => set MSB, else clear MSB
-  push temp 1
-  push constant 1
-  eq
-  if-goto SET_MSB
-
-  // parity != 1 => clear MSB => mask with 0x7FFF (32767)
-  push temp 0
-  push constant 32767
-  and
-  return
-
-  label SET_MSB
-    // set MSB => OR with 0x8000 (32768)
-    push temp 0
-    push constant 32768
-    or
+label PARITY_DONE
+    push local 0
     return
 
+// Encode function: encode input with parity bit
+function Sys.encode 0
+    push argument 0
+    call Sys.computeParity 1  // compute parity bit
 
-/*******************************************************
- * Sys.init
- * A simple test sequence for each function.
- * When run, the topmost stack elements (from top to bottom)
- * after Sys.init completes should be:
- *   - 32799 (encoded 31)
- *   - 1     (parity of 31)
- *   - 24    (6 << 2)
- *   - 10    (12 XOR 6)
- *******************************************************/
+    push constant 1
+    eq
+    if-goto SET_HIGH_BIT  // if parity == 1, set high bit
+
+    push argument 0
+    push constant 32767
+    and  // clear high bit
+    return
+
+label SET_HIGH_BIT
+    push argument 0
+    push constant 32767
+    not
+    or  // set high bit
+    return
+
+// Initialization function
 function Sys.init 0
-  // 1) Test Sys.xor => 12 XOR 6 => Expect 10 on top
-  push constant 12
-  push constant 6
-  call Sys.xor 2
+    call Sys.encode 1
 
-  // 2) Test Sys.shiftLeft => 6 << 2 => Expect 24 on top
-  push constant 6
-  push constant 2
-  call Sys.shiftLeft 2
-
-  // 3) Test Sys.computeParity => parity(31) => bits=00011111 => 5 ones => 1
-  push constant 31
-  call Sys.computeParity 1
-
-  // 4) Test Sys.encode => encode(31) => set MSB => 32768 + 31 => 32799
-  push constant 31
-  call Sys.encode 1
-
-  return
+label MAIN_LOOP
+    goto MAIN_LOOP
